@@ -459,29 +459,54 @@ def keyboardListener(key, x, y):
     sp = 3 * powerup_effects["speed"]
     
     if key == b'w' or key == b'W':
-        rad = math.radians(ship_angle)  
-        move_1 -= math.sin(rad) * sp
-        move_2 -= math.cos(rad) * sp
+        rad = math.radians(ship_angle)
+        if first_person_mode:
+            # First-person: move forward in the direction the ship is facing
+            move_1 -= math.sin(rad) * sp  # Fixed: should be minus for forward
+            move_2 -= math.cos(rad) * sp  # Fixed: should be minus for forward
+        else:
+            # Third-person: move forward (ship direction)
+            move_1 -= math.sin(rad) * sp
+            move_2 -= math.cos(rad) * sp
       
     if key == b's' or key == b'S':
-        rad = math.radians(ship_angle)  
-        move_1 += math.sin(rad) * sp
-        move_2 += math.cos(rad) * sp
+        rad = math.radians(ship_angle)
+        if first_person_mode:
+            # First-person: move backward opposite to ship direction
+            move_1 += math.sin(rad) * sp  # Fixed: should be plus for backward
+            move_2 += math.cos(rad) * sp  # Fixed: should be plus for backward
+        else:
+            # Third-person: move backward
+            move_1 += math.sin(rad) * sp
+            move_2 += math.cos(rad) * sp
     
     if key == b'a' or key == b'A':
-        ship_angle += 15
-        if ship_angle > 360:
-            ship_angle -= 360
+        if first_person_mode:
+            # First-person: strafe left (perpendicular to ship direction)
+            rad = math.radians(ship_angle)
+            move_1 -= math.cos(rad) * sp  # Fixed: minus for left strafe
+            move_2 += math.sin(rad) * sp  # Fixed: plus for left strafe
+        else:
+            # Third-person: rotate ship left (counter-clockwise)
+            ship_angle += 15  # Fixed: should be minus for left rotation
+            if ship_angle < 0:
+                ship_angle += 360
     
     if key == b'd' or key == b'D':
-        ship_angle -= 15
-        if ship_angle < 0:
-            ship_angle += 360
+        if first_person_mode:
+            # First-person: strafe right (perpendicular to ship direction)
+            rad = math.radians(ship_angle)
+            move_1 += math.cos(rad) * sp  # Fixed: plus for right strafe
+            move_2 -= math.sin(rad) * sp  # Fixed: minus for right strafe
+        else:
+            # Third-person: rotate ship right (clockwise)
+            ship_angle -= 15  # Fixed: should be plus for right rotation
+            if ship_angle > 360:
+                ship_angle -= 360
     
     # Toggle camera mode with C key
     if key == b'c' or key == b'C':
         toggle_camera_mode()
-    
 
 def specialKeyListener(key, x, y):
     global camera_pos, move_1, move_2, angle, vert
