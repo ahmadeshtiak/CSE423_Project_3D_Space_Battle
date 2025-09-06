@@ -37,6 +37,9 @@ arena_size = 800
 
 # Random stars
 stars = [(random.randint(-1500,1500), random.randint(-1500,1500), random.randint(-1500,1500)) for _ in range(500)]
+#powerup effect vars
+powerup_durations = {"speed": 10, "firerate": 10, "shield": 10}
+powerup_timers = {"speed": 0, "firerate": 0, "shield": 0}
 
 # Enemy variables
 enemies = []  
@@ -439,6 +442,51 @@ def reset_game():
         powerups.append((x, y, z, t))
     
     game_state = PLAYING
+def check_powerup_collision():
+    global move_1, move_2, vert, powerups, powerup_effects, powerup_timers
+    ship_pos = (-move_1, move_2, 100+vert)
+    new_list=[]
+    for (x,y,z,t) in powerups:
+        if abs(ship_pos[0]-x)<30 and abs(ship_pos[1]-y)<30 and abs(ship_pos[2]-z)<30:
+            powerup_effects[t] = 2 if t in ["speed","firerate"] else True
+            powerup_timers[t] = time.time()
+        else:
+            new_list.append((x,y,z,t))
+    powerups=new_list
+def update_powerups():
+    global powerup_effects, powerup_timers
+    current = time.time()
+    for t in ["speed","firerate","shield"]:
+        if powerup_effects[t] != (1 if t!="shield" else False):
+            if current - powerup_timers[t] > powerup_durations[t]:
+                powerup_effects[t] = 1 if t!="shield" else False
+def check_enemy_laser_hits():
+    global enemies, player_health, powerup_effects
+    ship_x, ship_y, ship_z = -move_1, move_2, 100 + vert
+    for enemy in enemies:
+        if hasattr(enemy, 'laser_end_time') and time.time() < enemy.laser_end_time:
+            dx,dy,dz = enemy.laser_direction
+            # Distance from ship to laser line
+            px,py,pz = ship_x-enemy.x, ship_y-enemy.y, ship_z-enemy.z
+            cross_x = py*dz - pz*dy
+            cross_y = pz*dx - px*dz
+            cross_z = px*dy - py*dx
+            dist = math.sqrt(cross_x**2 + cross_y**2 + cross_z**2)
+            if dist < 30:  # hitbox radius
+                if not powerup_effects["shield"]:
+                    player_health -= 5
+def idle():
+    if game_state == PLAYING:
+        check_powerup_collision()
+        update_powerups()              # <-- added
+        spawn_initial_enemies()
+        update_enemies()
+        cleanup_far_enemies()
+        cleanup_old_bullets()
+        check_bullet_enemy_collision()
+        check_enemy_laser_hits()       # <-- added
+    glutPostRedisplay()
+
 
 def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glColor3f(1,1,1)
