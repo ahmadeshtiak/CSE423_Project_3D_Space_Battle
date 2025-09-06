@@ -116,9 +116,8 @@ class Enemy:
             dy /= dist
             dz /= dist
         
-        # Create a brief laser effect instead of persistent bullet
         current_time = time.time()
-        self.laser_end_time = current_time + 0.3  # Laser lasts only 0.3 seconds
+        self.laser_end_time = current_time + 0.3  
         self.laser_direction = (dx, dy, dz)
         self.laser_distance = dist 
 
@@ -132,8 +131,7 @@ class Enemy:
             y += dy * bullet_speed
             z += dz * bullet_speed
             
-            # Remove distance check - only check lifetime
-            if time.time() - spawn_time < 5:  # Keep bullets for 5 seconds regardless of distance
+            if time.time() - spawn_time < 5: 
                 new_bullets.append([x, y, z, dx, dy, dz, spawn_time])
                     
         self.bullets = new_bullets
@@ -177,25 +175,21 @@ class Enemy:
         
         self.draw_drone_shape(scale)
         
-        # Draw laser if currently firing
         current_time = time.time()
         if hasattr(self, 'laser_end_time') and current_time < self.laser_end_time:
-            glColor3f(1, 0.2, 0.2)  # Red laser color
-            glLineWidth(1)  # Thicker laser
+            glColor3f(1, 0.2, 0.2)  
+            glLineWidth(1) 
             
-            # Calculate distance to ship to make laser reach exactly to the ship
             ship_x, ship_y, ship_z = -move_1, move_2, 100 + vert
             distance_to_ship = math.sqrt((ship_x - self.x)**2 + (ship_y - self.y)**2 + (ship_z - self.z)**2)
             
-            # Draw laser beam that reaches exactly to the ship position
             dx, dy, dz = self.laser_direction
             glBegin(GL_LINES)
-            glVertex3f(0, 0, 0)  # Start at drone position
-            # End at the calculated point that reaches the ship
+            glVertex3f(0, 0, 0)  
             glVertex3f(dx * distance_to_ship, dy * distance_to_ship, dz * distance_to_ship)
             glEnd()
             
-            glLineWidth(1)  # Reset line width
+            glLineWidth(1)  
                 
         glPopMatrix()
 
@@ -277,7 +271,7 @@ def check_bullet_enemy_collision():
 def toggle_camera_mode():
     global first_person_mode, camera_mode_timer
     current_time = time.time()
-    if current_time - camera_mode_timer > 0.5:  # Debounce to prevent rapid toggling
+    if current_time - camera_mode_timer > 0.5: 
         first_person_mode = not first_person_mode
         camera_mode_timer = current_time
         if first_person_mode:
@@ -287,7 +281,6 @@ def toggle_camera_mode():
 
 def draw_cockpit():
     if first_person_mode:
-        # Switch to 2D orthographic projection for HUD
         glMatrixMode(GL_PROJECTION)
         glPushMatrix()
         glLoadIdentity()
@@ -296,7 +289,7 @@ def draw_cockpit():
         glPushMatrix()
         glLoadIdentity()
         
-        # Draw simple cockpit frame (crosshairs and basic elements)
+       
         glColor3f(0.8, 0.8, 0.8)
         
         # Crosshairs
@@ -309,7 +302,6 @@ def draw_cockpit():
         glVertex2f(500, 550)
         glEnd()
         
-        # Cockpit frame elements
         glBegin(GL_QUADS)
         # Bottom panel
         glVertex2f(100, 100)
@@ -329,7 +321,6 @@ def draw_cockpit():
         glVertex2f(800, 800)
         glEnd()
         
-        # Restore 3D projection
         glPopMatrix()
         glMatrixMode(GL_PROJECTION)
         glPopMatrix()
@@ -395,14 +386,12 @@ def draw_bullets():
         y += dy * bullet_speed
         z += dz * bullet_speed
         
-        # Remove distance check - bullets should be visible until they time out
-        # Only check if they've been alive for too long
         glPushMatrix()
         glTranslatef(x, y, z)
-        glutSolidSphere(8, 10, 10)  # Increased size for better visibility
+        glutSolidSphere(8, 10, 10)  
         glPopMatrix()
         
-        # Keep bullets for longer distance but add timeout
+       
         new_bullets.append((x, y, z, dx, dy, dz))
     
     bullets = new_bullets
@@ -461,50 +450,41 @@ def keyboardListener(key, x, y):
     if key == b'w' or key == b'W':
         rad = math.radians(ship_angle)
         if first_person_mode:
-            # First-person: move forward in the direction the ship is facing
-            move_1 -= math.sin(rad) * sp  # Fixed: should be minus for forward
-            move_2 -= math.cos(rad) * sp  # Fixed: should be minus for forward
+            move_1 -= math.sin(rad) * sp 
+            move_2 -= math.cos(rad) * sp 
         else:
-            # Third-person: move forward (ship direction)
             move_1 -= math.sin(rad) * sp
             move_2 -= math.cos(rad) * sp
       
     if key == b's' or key == b'S':
         rad = math.radians(ship_angle)
         if first_person_mode:
-            # First-person: move backward opposite to ship direction
-            move_1 += math.sin(rad) * sp  # Fixed: should be plus for backward
-            move_2 += math.cos(rad) * sp  # Fixed: should be plus for backward
+            move_1 += math.sin(rad) * sp  
+            move_2 += math.cos(rad) * sp  
         else:
-            # Third-person: move backward
             move_1 += math.sin(rad) * sp
             move_2 += math.cos(rad) * sp
     
     if key == b'a' or key == b'A':
         if first_person_mode:
-            # First-person: strafe left (perpendicular to ship direction)
             rad = math.radians(ship_angle)
-            move_1 -= math.cos(rad) * sp  # Fixed: minus for left strafe
-            move_2 += math.sin(rad) * sp  # Fixed: plus for left strafe
+            move_1 -= math.cos(rad) * sp 
+            move_2 += math.sin(rad) * sp 
         else:
-            # Third-person: rotate ship left (counter-clockwise)
-            ship_angle += 15  # Fixed: should be minus for left rotation
+            ship_angle += 15  
             if ship_angle < 0:
                 ship_angle += 360
     
     if key == b'd' or key == b'D':
         if first_person_mode:
-            # First-person: strafe right (perpendicular to ship direction)
             rad = math.radians(ship_angle)
-            move_1 += math.cos(rad) * sp  # Fixed: plus for right strafe
-            move_2 -= math.sin(rad) * sp  # Fixed: minus for right strafe
+            move_1 += math.cos(rad) * sp 
+            move_2 -= math.sin(rad) * sp 
         else:
-            # Third-person: rotate ship right (clockwise)
-            ship_angle -= 15  # Fixed: should be plus for right rotation
+            ship_angle -= 15  
             if ship_angle > 360:
                 ship_angle -= 360
     
-    # Toggle camera mode with C key
     if key == b'c' or key == b'C':
         toggle_camera_mode()
 
@@ -531,7 +511,6 @@ def specialKeyListener(key, x, y):
     if key == GLUT_KEY_DOWN:
         vert -= 3
     
-    # Update camera position
     x, y, z = camera_pos
     camera_pos = (x, y, z)
 
@@ -565,35 +544,31 @@ def setupCamera():
     ship_x, ship_y, ship_z = -move_1, move_2, 100 + vert
     
     if first_person_mode:
-        # First-person view from cockpit
-        player_angle_rad = math.radians(ship_angle)  # Use ship angle for FPS view
+        player_angle_rad = math.radians(ship_angle)  
         
-        # Camera position: inside the ship cockpit
         camera_x = ship_x
         camera_y = ship_y
-        camera_z = ship_z + 30  # Slightly above ship center
+        camera_z = ship_z + 30  
         
-        # Calculate look-at direction based on ship rotation
         look_x = ship_x - math.sin(player_angle_rad) * 100
         look_y = ship_y - math.cos(player_angle_rad) * 100
         look_z = ship_z
         
-        gluLookAt(camera_x, camera_y, camera_z,  # Camera position (cockpit)
-                  look_x, look_y, look_z,        # Look direction (where ship is pointing)
-                  0, 0, 1)                      # Up vector
+        gluLookAt(camera_x, camera_y, camera_z,  
+                  look_x, look_y, look_z,        
+                  0, 0, 1)                    
     else:
         # Third-person view (original)
         player_angle_rad = math.radians(angle)
         
-        # Camera position: behind and above the player
         camera_distance = 300
         camera_height = 150
         camera_x = ship_x + math.sin(player_angle_rad) * camera_distance
         camera_y = ship_y + math.cos(player_angle_rad) * camera_distance
         camera_z = ship_z + camera_height
         
-        gluLookAt(camera_x, camera_y, camera_z,  # Camera position
-                  ship_x, ship_y, ship_z,        # Look at player
+        gluLookAt(camera_x, camera_y, camera_z,  
+                  ship_x, ship_y, ship_z,       
                   0, 0, 1) 
        
 
@@ -617,15 +592,13 @@ def showScreen():
     draw_stars()
     draw_arena()
     draw_powerups()
-    if not first_person_mode:  # Don't draw own ship in first-person view
+    if not first_person_mode:  
         draw_shapes()
     draw_bullets()
     draw_enemies()
     
-    # Draw cockpit overlay if in first-person mode
     draw_cockpit()
     
-    # Display info with debug
     draw_text(20, 970, f"Health: {player_health}")
     draw_text(20, 940, f"Score: {score}")
     draw_text(20, 910, f"Drones: {len(enemies)}/{max_enemies}")
@@ -648,7 +621,6 @@ def main():
     
     game_start_time = time.time()
     
-    # Generate random powerups
     for _ in range(8):
         t = random.choice(["speed", "firerate", "shield"])
         x = random.randint(-arena_size//2, arena_size//2)
