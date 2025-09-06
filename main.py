@@ -3,6 +3,14 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 import math, random, time
 
+# Game state constants
+START_SCREEN = 0
+PLAYING = 1
+GAME_OVER = 2
+
+# Initialize game state
+game_state = START_SCREEN
+
 # Camera-related variables
 camera_pos = (0, 250, 250)
 fovY = 120
@@ -14,7 +22,6 @@ move_2 = 0
 vert = 0
 first_person_mode = False
 camera_mode_timer = 0
-
 
 # Bullets (x,y,z,dx,dy,dz)
 bullets = []
@@ -31,13 +38,11 @@ arena_size = 800
 # Random stars
 stars = [(random.randint(-1500,1500), random.randint(-1500,1500), random.randint(-1500,1500)) for _ in range(500)]
 
-
-# Enemy variabls
+# Enemy variables
 enemies = []  
 max_enemies = 3 
 player_health = 100
 score = 0
-game_start_time = time.time()
 last_enemy_destroy_time = 0
 enemy_respawn_cooldown = 10 
 
@@ -93,8 +98,6 @@ class Enemy:
             self.shoot()
             self.last_shot = current_time
             
-
-        
     def get_scale(self):
         if self.distance < 100:
             return 2.0
@@ -195,13 +198,10 @@ class Enemy:
 
 def spawn_initial_enemies():
     global enemies
-    if len(enemies) == 0 and time.time() - game_start_time > 2:
+    if len(enemies) == 0:
         for i in range(max_enemies):
             enemy = Enemy(i)  
             enemies.append(enemy)
-            print(f"Enemy {i+1} spawned at: ({enemy.x:.1f}, {enemy.y:.1f}, {enemy.z:.1f})")
-            print(f"Initial distance: {enemy.initial_distance:.1f}")
-        print("Enemy drones deployed!")
 
 def update_enemies():
     global enemies, last_enemy_destroy_time
@@ -216,7 +216,6 @@ def update_enemies():
         
         if dist < 150 or dist > 1000 or (ship_x - enemy.x) * math.sin(math.radians(angle)) + (ship_y - enemy.y) * math.cos(math.radians(angle)) < -100:
             enemies.remove(enemy)
-            print(f"Enemy removed (distance: {dist:.1f})")
     
     if (len(enemies) < max_enemies and 
         current_time - last_enemy_destroy_time > enemy_respawn_cooldown):
@@ -225,9 +224,9 @@ def update_enemies():
         while len(enemies) < max_enemies:
             new_enemy = Enemy(len(enemies))
             enemies.append(new_enemy)
-            print(f"Enemy respawned at distance: {new_enemy.distance:.1f}")
         
         last_enemy_destroy_time = current_time 
+
 def cleanup_far_enemies():
     global enemies
     ship_x, ship_y, ship_z = -move_1, move_2, 100 + vert
@@ -236,7 +235,6 @@ def cleanup_far_enemies():
         
         if dist > 1200:
             enemies.remove(enemy)
-            print(f"Far enemy removed (distance: {dist:.1f})")
 
 def cleanup_old_enemy_bullets():
     global enemies
@@ -261,7 +259,6 @@ def check_bullet_enemy_collision():
                 if enemy.health <= 0:
                     enemies.remove(enemy)
                     score += 200
-                    print(f"Drone destroyed! Score: {score}")
                     if len(enemies) < max_enemies:
                         enemies.append(Enemy(len(enemies))) 
                 if bullet in bullets:
@@ -274,10 +271,6 @@ def toggle_camera_mode():
     if current_time - camera_mode_timer > 0.5: 
         first_person_mode = not first_person_mode
         camera_mode_timer = current_time
-        if first_person_mode:
-            print("First-person view activated!")
-        else:
-            print("Third-person view activated!")
 
 def draw_cockpit():
     if first_person_mode:
@@ -289,7 +282,6 @@ def draw_cockpit():
         glPushMatrix()
         glLoadIdentity()
         
-       
         glColor3f(0.8, 0.8, 0.8)
         
         # Crosshairs
@@ -326,6 +318,128 @@ def draw_cockpit():
         glPopMatrix()
         glMatrixMode(GL_MODELVIEW)
 
+def draw_start_screen():
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    glViewport(0, 0, 1000, 1000)
+    
+    # Set up orthographic projection for 2D text
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, 1000, 0, 1000)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+    
+    # Draw title
+    glColor3f(1, 1, 1)
+    text = "3D SPACE BATTLE ARENA"
+    glRasterPos2f(350, 700)
+    for ch in text:
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, ord(ch))
+    
+    # Draw instructions
+    instructions = [
+        "Controls:",
+        "W/S - Move forward/backward",
+        "A/D - Rotate ship",
+        "Arrow Keys - Adjust camera",
+        "Left Click - Fire weapon",
+        "C - Toggle camera view",
+        "",
+        "Press SPACE to start/pause",
+        "Press R to restart"
+    ]
+    
+    y_pos = 600
+    for line in instructions:
+        glRasterPos2f(400, y_pos)
+        for ch in line:
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
+        y_pos -= 30
+    
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+    
+    glutSwapBuffers()
+
+def draw_game_over_screen():
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
+    glViewport(0, 0, 1000, 1000)
+    
+    # Set up orthographic projection for 2D text
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, 1000, 0, 1000)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+    
+    # Draw game over text
+    glColor3f(1, 0, 0)
+    text = "GAME OVER"
+    glRasterPos2f(400, 700)
+    for ch in text:
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, ord(ch))
+    
+    # Draw score
+    glColor3f(1, 1, 1)
+    score_text = f"Final Score: {score}"
+    glRasterPos2f(430, 600)
+    for ch in score_text:
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
+    
+    # Draw restart instructions
+    instructions = [
+        "Press R to restart",
+        "Press ESC to quit"
+    ]
+    
+    y_pos = 500
+    for line in instructions:
+        glRasterPos2f(430, y_pos)
+        for ch in line:
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
+        y_pos -= 30
+    
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+    
+    glutSwapBuffers()
+
+def reset_game():
+    global game_state, player_health, score, enemies, bullets, powerups
+    global move_1, move_2, vert, angle, ship_angle
+    
+    # Reset game variables
+    player_health = 100
+    score = 0
+    enemies = []
+    bullets = []
+    powerups = []
+    move_1 = 0
+    move_2 = 0
+    vert = 0
+    angle = 0
+    ship_angle = 0
+    
+    # Initialize powerups
+    for _ in range(8):
+        t = random.choice(["speed", "firerate", "shield"])
+        x = random.randint(-arena_size//2, arena_size//2)
+        y = random.randint(-arena_size//2, arena_size//2)
+        z = random.randint(50, 200)
+        powerups.append((x, y, z, t))
+    
+    game_state = PLAYING
+
 def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glColor3f(1,1,1)
     glMatrixMode(GL_PROJECTION)
@@ -342,7 +456,6 @@ def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
-
 
 def draw_shapes():
     global move_1, move_2, vert, ship_angle  
@@ -391,7 +504,6 @@ def draw_bullets():
         glutSolidSphere(8, 10, 10)  
         glPopMatrix()
         
-       
         new_bullets.append((x, y, z, dx, dy, dz))
     
     bullets = new_bullets
@@ -440,10 +552,28 @@ def draw_stars():
         glVertex3f(x,y,z)
     glEnd()
 
-
-
 def keyboardListener(key, x, y):
-    global vert, angle, move_1, move_2, ship_angle
+    global game_state, vert, angle, move_1, move_2, ship_angle
+    
+    # Handle game state transitions
+    if key == b' ':
+        if game_state == START_SCREEN:
+            reset_game()
+        elif game_state == PLAYING:
+            game_state = START_SCREEN
+        return
+    
+    if key == b'r' or key == b'R':
+        reset_game()
+        return
+    
+    if key == b'\x1b':  # ESC key
+        glutLeaveMainLoop()
+        return
+    
+    # Only process movement keys if in PLAYING state
+    if game_state != PLAYING:
+        return
     
     sp = 3 * powerup_effects["speed"]
     
@@ -491,6 +621,10 @@ def keyboardListener(key, x, y):
 def specialKeyListener(key, x, y):
     global camera_pos, move_1, move_2, angle, vert
     
+    # Only process special keys if in PLAYING state
+    if game_state != PLAYING:
+        return
+    
     sp = 3 * powerup_effects["speed"]
     
     if key == GLUT_KEY_LEFT:
@@ -498,13 +632,11 @@ def specialKeyListener(key, x, y):
         if angle > 360:
             angle -= 360
     
-
     if key == GLUT_KEY_RIGHT:
         angle -= 15
         if angle < 0:
             angle += 360
     
-
     if key == GLUT_KEY_UP:
         vert += 3
     
@@ -514,9 +646,11 @@ def specialKeyListener(key, x, y):
     x, y, z = camera_pos
     camera_pos = (x, y, z)
 
-
 def mouseListener(button, state, x, y):
     global bullets, move_1, move_2, vert, ship_angle
+
+    if game_state != PLAYING:
+        return
     
     if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
         rad = math.radians(ship_angle)
@@ -570,23 +704,40 @@ def setupCamera():
         gluLookAt(camera_x, camera_y, camera_z,  
                   ship_x, ship_y, ship_z,       
                   0, 0, 1) 
-       
-
 
 def idle():
-    check_powerup_collision()
-    spawn_initial_enemies()
-    update_enemies()
-    cleanup_far_enemies()
-    cleanup_old_bullets()
-    check_bullet_enemy_collision()
+    if game_state == PLAYING:
+        check_powerup_collision()
+        spawn_initial_enemies()
+        update_enemies()
+        cleanup_far_enemies()
+        cleanup_old_bullets()
+        check_bullet_enemy_collision()
+    
     glutPostRedisplay()
 
 def showScreen():
+    global game_state
+    
+    if game_state == START_SCREEN:
+        draw_start_screen()
+        return
+    
+    if game_state == GAME_OVER:
+        draw_game_over_screen()
+        return
+    
+    # PLAYING state
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
     glViewport(0, 0, 1000, 1000)
     setupCamera()
+    
+    # Check for game over condition
+    if player_health <= 0:
+        game_state = GAME_OVER
+        draw_game_over_screen()
+        return
     
     # Draw 3D scene
     draw_stars()
@@ -599,6 +750,7 @@ def showScreen():
     
     draw_cockpit()
     
+    # Draw HUD with game info
     draw_text(20, 970, f"Health: {player_health}")
     draw_text(20, 940, f"Score: {score}")
     draw_text(20, 910, f"Drones: {len(enemies)}/{max_enemies}")
@@ -607,7 +759,7 @@ def showScreen():
     glutSwapBuffers()
 
 def main():
-    global powerups, game_start_time
+    global powerups
     glutInit()
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(1000, 1000)
@@ -619,8 +771,7 @@ def main():
     glutMouseFunc(mouseListener)
     glutIdleFunc(idle)
     
-    game_start_time = time.time()
-    
+    # Initialize powerups
     for _ in range(8):
         t = random.choice(["speed", "firerate", "shield"])
         x = random.randint(-arena_size//2, arena_size//2)
@@ -628,8 +779,7 @@ def main():
         z = random.randint(50, 200)
         powerups.append((x, y, z, t))
     
-    print("Game started! Enemy drones will appear in the distance.")
-    print("They will grow larger as you approach and fire laser beams.")
+    print("Game started! Press SPACE to begin.")
     
     glutMainLoop()
 
