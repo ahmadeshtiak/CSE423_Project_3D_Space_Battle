@@ -17,6 +17,7 @@ fovY = 120
 GRID_LENGTH = 600
 angle = 0
 ship_angle = 0
+ship_roll = 0
 move_1 = 0
 move_2 = 0
 vert = 0
@@ -31,6 +32,7 @@ bullet_speed = 5
 powerups = []
 powerup_effects = {"speed": 1, "firerate": 1, "shield": False}
 last_powerup_time = 0
+p_speed = False
 
 # Arena settings
 arena_size = 800
@@ -347,6 +349,8 @@ def draw_start_screen():
         "Controls:",
         "W/S - Move forward/backward",
         "A/D - Rotate ship",
+        "J/L - Roll ship",
+        "P/O - Power up/down",
         "Arrow Keys - Adjust camera",
         "Left Click - Fire weapon",
         "C - Toggle camera view",
@@ -419,7 +423,7 @@ def draw_game_over_screen():
 
 def reset_game():
     global game_state, player_health, score, enemies, bullets, powerups
-    global move_1, move_2, vert, angle, ship_angle
+    global move_1, move_2, vert, angle, ship_angle, ship_roll
     
     # Reset game variables
     player_health = 100
@@ -432,6 +436,7 @@ def reset_game():
     vert = 0
     angle = 0
     ship_angle = 0
+    ship_roll = 0  # Reset roll angle
     
     # Initialize powerups
     for _ in range(8):
@@ -440,8 +445,8 @@ def reset_game():
         y = random.randint(-arena_size//2, arena_size//2)
         z = random.randint(50, 200)
         powerups.append((x, y, z, t))
-    
     game_state = PLAYING
+
 def check_powerup_collision():
     global move_1, move_2, vert, powerups, powerup_effects, powerup_timers
     ship_pos = (-move_1, move_2, 100+vert)
@@ -461,48 +466,28 @@ def update_powerups():
             if current - powerup_timers[t] > powerup_durations[t]:
                 powerup_effects[t] = 1 if t!="shield" else False
 def check_enemy_laser_hits():
-    global enemies, player_health, powerup_effects, move_1, move_2, vert
+    global enemies, player_health, powerup_effects
     ship_x, ship_y, ship_z = -move_1, move_2, 100 + vert
-
     for enemy in enemies:
         if hasattr(enemy, 'laser_end_time') and time.time() < enemy.laser_end_time:
-            # Laser segment: enemy -> ship direction * laser_distance
-            ex, ey, ez = enemy.x, enemy.y, enemy.z
             dx, dy, dz = enemy.laser_direction
-            lx, ly, lz = ex + dx * enemy.laser_distance, ey + dy * enemy.laser_distance, ez + dz * enemy.laser_distance
-
-            # Vector math: distance from point to line segment
-            px, py, pz = ship_x, ship_y, ship_z
-            vx, vy, vz = lx - ex, ly - ey, lz - ez  # laser vector
-            wx, wy, wz = px - ex, py - ey, pz - ez  # player relative vector
-
-            laser_len2 = vx*vx + vy*vy + vz*vz
-            if laser_len2 == 0:
-                continue
-            t = max(0, min(1, (wx*vx + wy*vy + wz*vz) / laser_len2))
-            cx, cy, cz = ex + t*vx, ey + t*vy, ez + t*vz  # closest point
-            dist = math.sqrt((px-cx)**2 + (py-cy)**2 + (pz-cz)**2)
-
-            # Hit check
-            if dist < 30:  # 30 units radius
-                if not powerup_effects["shield"]:
-                    player_health -= 10   # DAMAGE APPLIES HERE
-                    if player_health < 0:
-                        player_health = 0
-                enemy.laser_end_time = 0  # prevent double-hits from same beam
-
-def idle():
-    if game_state == PLAYING:
-        check_powerup_collision()
-        update_powerups()
-        spawn_initial_enemies()
-        update_enemies()
-        cleanup_far_enemies()
-        cleanup_old_bullets()
-        check_bullet_enemy_collision()
-        check_enemy_laser_hits()   
-    glutPostRedisplay()
-
+            px, py, pz = ship_x - enemy.x, ship_y - enemy.y, ship_z - enemy.z
+            
+            # projection of ship onto laser direction
+            proj = px*dx + py*dy + pz*dz
+            
+            if 0 < proj < enemy.laser_distance:  # within laser beam range
+                # perpendicular distance from line
+                cross_x = py*dz - pz*dy
+                cross_y = pz*dx - px*dz
+                cross_z = px*dy - py*dx
+                dist = math.sqrt(cross_x**2 + cross_y**2 + cross_z**2)
+                
+                if dist < 30:  # tighter hitbox
+                    if not powerup_effects["shield"]:
+                        if not hasattr(enemy, "last_damage_time") or time.time() - enemy.last_damage_time > 0.5:
+                            player_health -= 0.1
+                            enemy.last_damage_time = time.time()
 
 
 def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
@@ -521,15 +506,21 @@ def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
-    
+
 def draw_shapes():
-    global move_1, move_2, vert, ship_angle  
+    global move_1, move_2, vert, ship_angle, ship_roll  
     glPushMatrix()
     glColor3f(0.33, 0.45, 0.19)
     glTranslatef(-move_1, move_2, 100+vert)
-    glRotatef(90+ship_angle, 0, 0, 1) 
+    
+
+    glRotatef(ship_roll, 0, 1, 0)  # Roll around y axis
+    glRotatef(90+ship_angle, 0, 0, 1)  # Yaw rotation
+    
     glRotatef(-90, 0, 0, 1)
+    glScalef(1,3/2,1)
     glutSolidCube(100)
+    glScalef(1,2/3,1)
     glColor3f(0.15, 0.25, 0.19)
     glTranslatef(50, 0, -10)
     glRotatef(90, 0, 1, 0)
@@ -541,17 +532,18 @@ def draw_shapes():
     glColor3f(0.2, 0.7, 0.6)
     glRotatef(90, 0, 1, 0)
     glTranslatef(50, 0, 0)
-    glTranslatef(20, 100, 0)
+    glTranslatef(20, 120, 0)
     glRotatef(90, 1, 0, 0)
     gluCylinder(gluNewQuadric(), 20, 5, 60, 10, 10)
     glTranslatef(-40, 0, 0)
     gluCylinder(gluNewQuadric(), 20, 5, 60, 10, 10)
     glColor3f(0.1, 0.2, 0.3)
     glRotatef(-90, 1, 0, 0)
-    glTranslatef(-20, -100, 0)
+    glTranslatef(-20, -120, 0)
     glTranslatef(40, -40, 0)
     glRotatef(90, 1, 0, 0)
-    gluCylinder(gluNewQuadric(), 40, 5, 150, 10, 10)
+    glTranslate(0,40,0)
+    gluCylinder(gluNewQuadric(), 40, 5, 200, 10, 10)
     glPopMatrix()
 
 def draw_bullets():
@@ -618,14 +610,14 @@ def draw_stars():
     glEnd()
 
 def keyboardListener(key, x, y):
-    global game_state, vert, angle, move_1, move_2, ship_angle
+    global game_state, vert, angle, move_1, move_2, ship_angle, ship_roll, powerup_effects
     
     # Handle game state transitions
     if key == b' ':
-        if game_state == START_SCREEN:
-            reset_game()
-        elif game_state == PLAYING:
+        if game_state == PLAYING:
             game_state = START_SCREEN
+        elif game_state == START_SCREEN:
+            game_state = PLAYING
         return
     
     if key == b'r' or key == b'R':
@@ -680,8 +672,24 @@ def keyboardListener(key, x, y):
             if ship_angle > 360:
                 ship_angle -= 360
     
+    # Add roll controls
+    if key == b'j' or key == b'J':  # Roll left
+        ship_roll += 15
+        if ship_roll > 360:
+            ship_roll -= 360
+    
+    if key == b'l' or key == b'L':  # Roll right
+        ship_roll -= 15
+        if ship_roll < 0:
+            ship_roll += 360
+    
     if key == b'c' or key == b'C':
         toggle_camera_mode()
+    
+    if key == b'p' or key == b'P':
+        powerup_effects["speed"] = 10
+    if key == b'o' or key == b'o':
+        powerup_effects["speed"] = 1
 
 def specialKeyListener(key, x, y):
     global camera_pos, move_1, move_2, angle, vert
@@ -773,13 +781,16 @@ def setupCamera():
 def idle():
     if game_state == PLAYING:
         check_powerup_collision()
+        update_powerups()               # keep powerup timer update
         spawn_initial_enemies()
         update_enemies()
         cleanup_far_enemies()
         cleanup_old_bullets()
         check_bullet_enemy_collision()
+        check_enemy_laser_hits()        # <-- make sure this runs!
     
     glutPostRedisplay()
+
 
 def showScreen():
     global game_state
@@ -815,11 +826,32 @@ def showScreen():
     
     draw_cockpit()
     
+    # Save current matrices and set up for 2D text rendering
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, 1000, 0, 1000)  # Set up 2D orthographic projection
+    
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+    
+    # Disable depth testing for text
+    glDisable(GL_DEPTH_TEST)
+    
     # Draw HUD with game info
-    draw_text(20, 970, f"Health: {player_health}")
-    draw_text(20, 940, f"Score: {score}")
-    draw_text(20, 910, f"Drones: {len(enemies)}/{max_enemies}")
-    draw_text(20, 880, f"View: {'1st Person' if first_person_mode else '3rd Person'}")
+    draw_text(20, 80, f"Health: {player_health:.1f}")  # Show health with 1 decimal
+    draw_text(20, 110, f"Score: {score}")
+    draw_text(20, 140, f"PowerUp Mode: {'OFF' if powerup_effects['speed']==1 else 'ON'}")
+    draw_text(20, 170, f"View: {'1st Person' if first_person_mode else '3rd Person'}")
+    draw_text(20, 200, f"Roll: {ship_roll}°")
+    
+    # Restore settings
+    glEnable(GL_DEPTH_TEST)
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
     
     glutSwapBuffers()
 
