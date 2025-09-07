@@ -461,31 +461,48 @@ def update_powerups():
             if current - powerup_timers[t] > powerup_durations[t]:
                 powerup_effects[t] = 1 if t!="shield" else False
 def check_enemy_laser_hits():
-    global enemies, player_health, powerup_effects
+    global enemies, player_health, powerup_effects, move_1, move_2, vert
     ship_x, ship_y, ship_z = -move_1, move_2, 100 + vert
+
     for enemy in enemies:
         if hasattr(enemy, 'laser_end_time') and time.time() < enemy.laser_end_time:
-            dx,dy,dz = enemy.laser_direction
-            # Distance from ship to laser line
-            px,py,pz = ship_x-enemy.x, ship_y-enemy.y, ship_z-enemy.z
-            cross_x = py*dz - pz*dy
-            cross_y = pz*dx - px*dz
-            cross_z = px*dy - py*dx
-            dist = math.sqrt(cross_x**2 + cross_y**2 + cross_z**2)
-            if dist < 30:  # hitbox radius
+            # Laser segment: enemy -> ship direction * laser_distance
+            ex, ey, ez = enemy.x, enemy.y, enemy.z
+            dx, dy, dz = enemy.laser_direction
+            lx, ly, lz = ex + dx * enemy.laser_distance, ey + dy * enemy.laser_distance, ez + dz * enemy.laser_distance
+
+            # Vector math: distance from point to line segment
+            px, py, pz = ship_x, ship_y, ship_z
+            vx, vy, vz = lx - ex, ly - ey, lz - ez  # laser vector
+            wx, wy, wz = px - ex, py - ey, pz - ez  # player relative vector
+
+            laser_len2 = vx*vx + vy*vy + vz*vz
+            if laser_len2 == 0:
+                continue
+            t = max(0, min(1, (wx*vx + wy*vy + wz*vz) / laser_len2))
+            cx, cy, cz = ex + t*vx, ey + t*vy, ez + t*vz  # closest point
+            dist = math.sqrt((px-cx)**2 + (py-cy)**2 + (pz-cz)**2)
+
+            # Hit check
+            if dist < 30:  # 30 units radius
                 if not powerup_effects["shield"]:
-                    player_health -= 5
+                    player_health -= 10   # DAMAGE APPLIES HERE
+                    if player_health < 0:
+                        player_health = 0
+                enemy.laser_end_time = 0  # prevent double-hits from same beam
+
 def idle():
     if game_state == PLAYING:
         check_powerup_collision()
-        update_powerups()              # <-- added
+        update_powerups()
         spawn_initial_enemies()
         update_enemies()
         cleanup_far_enemies()
         cleanup_old_bullets()
         check_bullet_enemy_collision()
-        check_enemy_laser_hits()       # <-- added
+        check_enemy_laser_hits()   
     glutPostRedisplay()
+
 
 
 def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
@@ -504,7 +521,7 @@ def draw_text(x, y, text, font=GLUT_BITMAP_HELVETICA_18):
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
-
+    
 def draw_shapes():
     global move_1, move_2, vert, ship_angle  
     glPushMatrix()
